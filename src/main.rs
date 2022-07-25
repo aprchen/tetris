@@ -37,7 +37,7 @@ fn main() {
         .add_startup_system(camera_startup_system)
         .add_startup_system(map_startup_system)
         .add_system(basic_system)
-       // .add_system(pre_system)
+        // .add_system(pre_system)
         .run();
 }
 
@@ -52,22 +52,22 @@ struct AnimationTimer(Timer);
 
 struct SpeedTimer(Timer);
 
-#[derive(Component,Default, bevy_inspector_egui::Inspectable)]
-pub struct Square{
+#[derive(Component, Default, bevy_inspector_egui::Inspectable)]
+pub struct Square {
     central_location: Vec2,
     state: i32, // 0 空置,1 占位 2 元素过度
 }
 
-const STATE_EMPTY:i32=0;
-const STATE_WALKING:i32=2;
-const STATE_TAKE:i32=1;
+const STATE_EMPTY: i32 = 0;
+const STATE_WALKING: i32 = 2;
+const STATE_TAKE: i32 = 1;
 
 
 impl Square {
     fn new(loc: Vec2) -> Square {
-        Square{central_location:loc, state: STATE_EMPTY }
+        Square { central_location: loc, state: STATE_EMPTY }
     }
-    fn update_state(&mut self, state: i32){
+    fn update_state(&mut self, state: i32) {
         if self.state != STATE_TAKE {
             self.state = state;
         }
@@ -76,7 +76,7 @@ impl Square {
     #[allow(dead_code)]
     fn can_update(&self) -> bool {
         if self.state != STATE_EMPTY {
-           return false;
+            return false;
         }
         true
     }
@@ -84,16 +84,16 @@ impl Square {
 
 #[derive(Default, bevy_inspector_egui::Inspectable)]
 pub struct CurrentElement {
-    central_location:Vec2,
+    central_location: Vec2,
     shape: i32,
-    direction : i32,
-    state:i32, // 0 下行中,-1无法下行
+    direction: i32,
+    state: i32, // 0 下行中,-1无法下行
 }
 
 
 #[allow(dead_code)]
-fn is_against_wall_x (tar:f32) -> bool {
-    if tar== 0. || tar >= 11.0{
+fn is_against_wall_x(tar: f32) -> bool {
+    if tar == 0. || tar >= 11.0 {
         return true;
     }
     false
@@ -101,8 +101,8 @@ fn is_against_wall_x (tar:f32) -> bool {
 
 impl CurrentElement {
     #[allow(dead_code)]
-    fn new(central_location:Vec2, shape: i32,direction:i32) -> CurrentElement {
-        CurrentElement { central_location, shape ,direction,state:0}
+    fn new(central_location: Vec2, shape: i32, direction: i32) -> CurrentElement {
+        CurrentElement { central_location, shape, direction, state: 0 }
     }
     fn left(&mut self) {
         self.central_location.x -= 1.;
@@ -116,38 +116,30 @@ impl CurrentElement {
             self.central_location.y = 16.;
             return;
         }
-        if self.state == -1 &&  self.central_location.y !=0.{
+        if self.state == -1 && self.central_location.y != 0. {
             info!("状态初始化");
             self.central_location.y = 16.;
-            self.state = 0;
+            self.update_state(0);
             return;
         }
         self.central_location.y -= 1.0;
     }
+
     // 旋转
     fn rotate(&mut self) {
-        self.direction +=1;
-        if self.direction >3 {
+        self.direction += 1;
+        if self.direction > 3 {
             self.direction = 0;
         }
     }
 
-    fn square_match(&mut self, square:&Square) -> bool {
-        let cy = self.central_location.y;
-        // 判断下一行是否到底
-        // 判断下一行是否可以占用
-        if sprite::is_against_bottom_wall(cy,self.shape,self.direction) {
-            info!("已被占用1");
-            self.state = -1; //标记当前已不可以下行,需要占用当前位置
-        }
-        // 判断下一行是否存在被占用的
-        let nc = self.central_location;
-        if sprite::convex_up_match(Vec2::new(nc.x,nc.y-1.),square.central_location,self.direction) && square.state == STATE_TAKE {
-            info!("已被占用2");
-            self.state = -1; //标记当前已不可以下行,需要占用当前位置
-        }
+    fn update_state(&mut self, state: i32) {
+        self.state = state;
+    }
+
+    fn square_match(&mut self, square: &Square) -> bool {
         if self.shape == sprite::CONVEX {
-           return  sprite::convex_up_match(self.central_location,square.central_location,self.direction);
+            return sprite::convex_up_match(self.central_location, square.central_location, self.direction);
         }
         false
     }
@@ -177,7 +169,7 @@ fn basic_system(
     mut is_initialized: Local<bool>,
 ) {
     if !*is_initialized {
-        state.central_location = Vec2::new(6.,15.);
+        state.central_location = Vec2::new(6., 15.);
         *is_initialized = true;
     }
     if input.just_pressed(KeyCode::Left) {
@@ -186,36 +178,79 @@ fn basic_system(
     if input.just_pressed(KeyCode::Right) {
         state.right();
     }
-    if input.just_pressed(KeyCode::Up){
+    if input.just_pressed(KeyCode::Up) {
         state.rotate();
     }
     if timer.0.tick(tt.delta()).just_finished() {
         state.down();
-        for (mut sp, mut sq) in query.iter_mut() {
-            sq.update_state(STATE_EMPTY);
-            if state.square_match(&sq) {
-                // 如果当前元素状态为暂停了,且匹配到了对应方块
-                if state.state == -1{
-                    sq.update_state(STATE_TAKE);
-                }else {
-                    sq.update_state(STATE_WALKING);
-                }
-                if sq.state == STATE_WALKING || sq.state == STATE_TAKE {
-                    if sq.central_location == state.central_location {
-                        sp.color = Color::GOLD;
-                    }else {
-                        sp.color = Color::RED;
+
+        // 查找当前时刻元素方块坐标
+        let mut match_square: Vec<Vec2> = Vec::default();
+        for (_sp, sq) in query.iter() {
+            if state.square_match(sq) {
+                match_square.push(sq.central_location);
+            }
+        }
+
+        // 标记当前元素是否需要被冻结
+        for ms in match_square.iter() {
+            let ms_y = ms.y;
+            let ms_x = ms.x;
+            let next_y = ms_y - 1.;
+            let next_x = ms_x;
+            for ( _sp, sq) in query.iter_mut() {
+                if sq.central_location == *ms {
+                    if ms_y == 0. {
+                        //靠墙了,需要被冻结
+                        state.update_state(-1);
                     }
+                } else if sq.central_location.x == next_x && sq.central_location.y == next_y && sq.state == STATE_TAKE {
+                    //不是匹配方块，如果这个方块是匹配方块的下一行，且有任意一个是被占据的，则整个元素需要被冻结
+                    state.update_state(-1);
                 }
             }
         }
-        for (mut sp, sq) in query.iter_mut() {
-            if sq.state == STATE_EMPTY {
-                sp.color = BRICK_COLOR;
+
+        //状态更新，设置颜色
+        for (mut sp, mut sq) in query.iter_mut() {
+            if in_vec(sq.central_location,&match_square) {
+                // 如果当前元素状态是冻结，这几个方块状态都设为占据
+                if state.state == -1 {
+                    sq.update_state(STATE_TAKE);
+                    //更新颜色
+                    if sq.central_location == state.central_location {
+                        sp.color = Color::GOLD;
+                    } else {
+                        sp.color = Color::RED;
+                    }
+                } else {
+                    sq.update_state(STATE_WALKING);
+                    if sq.central_location == state.central_location {
+                        sp.color = Color::GOLD;
+                    } else {
+                        sp.color = Color::RED;
+                    }
+                }
+            }else {
+                // 不是当前元素方块的，恢复过渡状态的到初始状态
+                if sq.state == STATE_WALKING {
+                    sq.update_state(STATE_EMPTY);
+                    sp.color = BRICK_COLOR;
+                }
             }
         }
     }
 }
+
+fn in_vec(v: Vec2, data: &Vec<Vec2>) -> bool {
+    for datum in data {
+        if *datum == v {
+            return true;
+        }
+    }
+    false
+}
+
 
 fn camera_startup_system(mut cmd: Commands) {
     let mut camera = OrthographicCameraBundle::new_2d();
@@ -251,7 +286,7 @@ fn map_startup_system(mut commands: Commands) {
                     ..default()
                 })
                 .insert(Name::new(format!("square_row_{:?}_col_{:?}", row, col)))
-                .insert(Square::new(Vec2::new(col as f32,row as f32)))
+                .insert(Square::new(Vec2::new(col as f32, row as f32)))
                 .insert(TableArea);
         }
     }
@@ -277,7 +312,7 @@ fn map_startup_system(mut commands: Commands) {
                     ..default()
                 })
                 .insert(Name::new(format!("square_pre_row_{:?}_col_{:?}", row, col)))
-                .insert(Square::new(Vec2::new(col as f32,row as f32)))
+                .insert(Square::new(Vec2::new(col as f32, row as f32)))
                 .insert(PreviewArea);
         }
     }
