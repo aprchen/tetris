@@ -1,6 +1,4 @@
 use bevy::math::Vec2;
-use bevy::prelude::info;
-
 
 pub const CONVEX: i32 = 0;
 pub const UP: i32 = 0;
@@ -11,24 +9,22 @@ pub const LEFT: i32 = 3;
 
 pub fn is_against_bottom_wall (tar:f32,shape:i32,direction:i32) -> bool {
     let mut y = tar;
-    if shape == CONVEX {
-        if direction != UP{
+    if shape == CONVEX && direction != UP{
             y -= 1.
-        }
     }
     if y <= 0. {
         return true;
     }
-    return false;
+    false
 }
 
 
 
 pub fn convex_up_match(self_loc:Vec2,tar_loc:Vec2,direction:i32)->bool{
-    let x = tar_loc.x.clone();
-    let y = tar_loc.y.clone();
-    let sy = self_loc.y.clone();
-    let sx = self_loc.x.clone();
+    let x = tar_loc.x;
+    let y = tar_loc.y;
+    let sy = self_loc.y;
+    let sx = self_loc.x;
     if direction == UP {
         if (y == sy ) && (sx-1. == x || sx == x || sx+1. == x){
             return true;
@@ -61,5 +57,5 @@ pub fn convex_up_match(self_loc:Vec2,tar_loc:Vec2,direction:i32)->bool{
             return true;
         }
     }
-    return false;
+    false
 }

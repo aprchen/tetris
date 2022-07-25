@@ -1,6 +1,5 @@
 use bevy::diagnostic::{EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::*;
-use bevy::reflect::struct_partial_eq;
 use bevy::render::camera::ScalingMode;
 use bevy_editor_pls::*;
 
@@ -74,15 +73,12 @@ impl Square {
         }
     }
 
-    fn is_took(&self) -> bool {
-        self.state == STATE_TAKE
-    }
-
+    #[allow(dead_code)]
     fn can_update(&self) -> bool {
         if self.state != STATE_EMPTY {
-            return false;
+           return false;
         }
-        return true;
+        true
     }
 }
 
@@ -95,15 +91,16 @@ pub struct CurrentElement {
 }
 
 
-
+#[allow(dead_code)]
 fn is_against_wall_x (tar:f32) -> bool {
     if tar== 0. || tar >= 11.0{
         return true;
     }
-    return false;
+    false
 }
 
 impl CurrentElement {
+    #[allow(dead_code)]
     fn new(central_location:Vec2, shape: i32,direction:i32) -> CurrentElement {
         CurrentElement { central_location, shape ,direction,state:0}
     }
@@ -136,7 +133,7 @@ impl CurrentElement {
     }
 
     fn square_match(&mut self, square:&Square) -> bool {
-        let cy = self.central_location.y.clone();
+        let cy = self.central_location.y;
         // 判断下一行是否到底
         // 判断下一行是否可以占用
         if sprite::is_against_bottom_wall(cy,self.shape,self.direction) {
@@ -144,15 +141,15 @@ impl CurrentElement {
             self.state = -1; //标记当前已不可以下行,需要占用当前位置
         }
         // 判断下一行是否存在被占用的
-        let nc = self.central_location.clone();
-        if sprite::convex_up_match(Vec2::new(nc.x,nc.y-1.),square.central_location.clone(),self.direction) && square.state == STATE_TAKE {
+        let nc = self.central_location;
+        if sprite::convex_up_match(Vec2::new(nc.x,nc.y-1.),square.central_location,self.direction) && square.state == STATE_TAKE {
             info!("已被占用2");
             self.state = -1; //标记当前已不可以下行,需要占用当前位置
         }
         if self.shape == sprite::CONVEX {
-           return  sprite::convex_up_match(self.central_location.clone(),square.central_location.clone(),self.direction);
+           return  sprite::convex_up_match(self.central_location,square.central_location,self.direction);
         }
-        return false;
+        false
     }
 }
 
@@ -212,7 +209,7 @@ fn basic_system(
                 }
             }
         }
-        for (mut sp, mut sq) in query.iter_mut() {
+        for (mut sp, sq) in query.iter_mut() {
             if sq.state == STATE_EMPTY {
                 sp.color = BRICK_COLOR;
             }
@@ -238,7 +235,7 @@ fn map_startup_system(mut commands: Commands) {
                 TABLE_AREA_X + col as f32 * (1.0),
                 TABLE_AREA_Y + row as f32 * (1.0),
             );
-            let mut color = BRICK_COLOR;
+            let color = BRICK_COLOR;
             commands
                 .spawn()
                 .insert_bundle(SpriteBundle {
