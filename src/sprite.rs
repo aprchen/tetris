@@ -121,6 +121,7 @@ pub fn shape_l_match(self_loc: Vec2, tar_loc: Vec3, direction: i32) -> bool {
     false
 }
 
+//todo
 pub fn shape_j_match(self_loc: Vec2, tar_loc: Vec3, direction: i32) -> bool {
     let x = tar_loc.x;
     let y = tar_loc.y;

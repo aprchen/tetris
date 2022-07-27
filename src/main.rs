@@ -118,13 +118,13 @@ impl CurrentElement {
 
     fn square_match(&mut self, loc: Vec3) -> bool {
         return match self.shape {
-            sprite::SHAPE_T => return sprite::shape_t_match(self.central_location, loc, self.direction),
-            sprite::SHAPE_O => return sprite::shape_o_match(self.central_location, loc),
-            sprite::SHAPE_I => return sprite::shape_i_match(self.central_location, loc, self.direction),
-            sprite::SHAPE_J => return sprite::shape_j_match(self.central_location, loc, self.direction),
-            sprite::SHAPE_L => return sprite::shape_l_match(self.central_location, loc, self.direction),
-            sprite::SHAPE_S => return sprite::shape_s_match(self.central_location, loc, self.direction),
-            sprite::SHAPE_Z => return sprite::shape_z_match(self.central_location, loc, self.direction),
+            sprite::SHAPE_T =>  sprite::shape_t_match(self.central_location, loc, self.direction),
+            sprite::SHAPE_O =>  sprite::shape_o_match(self.central_location, loc),
+            sprite::SHAPE_I =>  sprite::shape_i_match(self.central_location, loc, self.direction),
+            sprite::SHAPE_J =>  sprite::shape_j_match(self.central_location, loc, self.direction),
+            sprite::SHAPE_L =>  sprite::shape_l_match(self.central_location, loc, self.direction),
+            sprite::SHAPE_S =>  sprite::shape_s_match(self.central_location, loc, self.direction),
+            sprite::SHAPE_Z =>  sprite::shape_z_match(self.central_location, loc, self.direction),
             _ => false,
         };
     }
@@ -151,7 +151,7 @@ fn remove_blocks(mut cmd: Commands, tt: Res<Time>, mut timer: ResMut<RemoveTimer
         }
 
         let max_key = ROW - 1;
-        if let Some(_) = sq_map.get(&max_key.to_string()) {
+        if sq_map.get(&max_key.to_string()).is_some() {
             info!("游戏结束");
             return;
         }
