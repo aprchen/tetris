@@ -127,10 +127,26 @@ impl CurrentElement {
 
     // 旋转
     fn rotate(&mut self, query: &Query<(&mut Sprite, &Transform, &mut Square), With<TableArea>>) {
-        let match_square = self.square_match(query);
         self.direction += 1;
         if self.direction > 3 {
             self.direction = 0;
+        }
+        // 旋转之后的图形
+        let match_square = self.square_match(query);
+        // 墙壁判断
+        let mut pass = true;
+        for v in match_square.iter() {
+            if v.x + 1. > COL as f32 || v.x < 0. || v.y <= 0.{
+                pass = false;
+            }
+        }
+
+        if !pass {
+            //方向回滚
+            self.direction -= 1;
+            if self.direction < 0 {
+                self.direction = 3
+            }
         }
     }
 
