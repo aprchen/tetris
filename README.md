@@ -16,7 +16,7 @@ build
 # build wasm 
 cargo build --release --target wasm32-unknown-unknown
 # bind wasm web
-wasm-bindgen --out-name tetris_wasm --out-dir doc/wasm --target web target/wasm32-unknown-unknown/release/tetris.wasm
+wasm-bindgen --out-name tetris_wasm --out-dir docs/wasm --target web target/wasm32-unknown-unknown/release/tetris.wasm
 ```
 
 
