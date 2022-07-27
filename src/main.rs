@@ -2,7 +2,8 @@ use std::borrow::{Borrow, BorrowMut};
 use std::collections::HashMap;
 use std::time::Duration;
 
-use bevy::{prelude::*, sprite::collide_aabb::collide};
+use bevy::prelude::*;
+// use bevy::sprite::collide_aabb::collide;
 use bevy::render::camera::ScalingMode;
 use rand::Rng;
 
@@ -12,8 +13,8 @@ mod sprite;
 const RESOLUTION: f32 = 16.0 / 9.0;
 const ROW: i32 = 20;
 const COL: i32 = 12;
-const PRE_AREA_X: f32 = 20.0;
-const PRE_AREA_Y: f32 = 15.0;
+// const PRE_AREA_X: f32 = 20.0;
+// const PRE_AREA_Y: f32 = 15.0;
 
 const SCALE: f32 = 0.8;
 
@@ -92,10 +93,8 @@ impl CurrentElement {
 
         for target in match_square.iter() {
             for (_sp, transform, sq) in query.iter() {
-                if sq.0 == STATE_TAKE {
-                    if target.x - 1. == transform.translation.x && target.y == transform.translation.y {
-                        return;
-                    }
+                if sq.0 == STATE_TAKE && target.x - 1. == transform.translation.x && target.y == transform.translation.y {
+                    return;
                 }
             }
         }
@@ -114,10 +113,8 @@ impl CurrentElement {
 
         for target in match_square.iter() {
             for (_sp, transform, sq) in query.iter() {
-                if sq.0 == STATE_TAKE {
-                    if target.x + 1. == transform.translation.x && target.y == transform.translation.y {
-                        return;
-                    }
+                if sq.0 == STATE_TAKE && target.x + 1. == transform.translation.x && target.y == transform.translation.y {
+                    return;
                 }
             }
         }
@@ -136,7 +133,7 @@ impl CurrentElement {
         // 墙壁判断
         let mut pass = true;
         for v in match_square.iter() {
-            if v.x + 1. > COL as f32 || v.x < 0. || v.y <= 0.{
+            if v.x + 1. > COL as f32 || v.x < 0. || v.y <= 0. {
                 pass = false;
             }
         }
@@ -206,7 +203,7 @@ impl CurrentElement {
 
     fn square_match(&mut self, query: &Query<(&mut Sprite, &Transform, &mut Square), With<TableArea>>) -> Vec<Vec3> {
         let mut match_square: Vec<Vec3> = Vec::default();
-        for (_sp, transform, sq) in query.iter() {
+        for (_sp, transform, _sq) in query.iter() {
             let loc = transform.translation;
             let res = match self.shape {
                 sprite::SHAPE_T => sprite::shape_t_match(self.central_location, loc, self.direction),
@@ -222,7 +219,7 @@ impl CurrentElement {
                 match_square.push(transform.translation);
             }
         }
-        return match_square;
+        match_square
     }
 }
 
@@ -257,7 +254,7 @@ fn remove_blocks(mut cmd: Commands, tt: Res<Time>, mut timer: ResMut<RemoveTimer
             if val == COL {
                 info!("remove block{:?}",key);
                 let key_val = key.parse::<i32>().unwrap();
-                for (entity, mut transform, sq) in query.iter_mut() {
+                for (entity, mut transform, _sq) in query.iter_mut() {
                     // 移去对应行
                     if transform.translation.y == key_val as f32 {
                         cmd.entity(entity).despawn()

@@ -1,9 +1,9 @@
 use bevy::diagnostic::{EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy_editor_pls::*;
-use bevy_inspector_egui::{RegisterInspectable, WorldInspectorPlugin};
-
-use crate::{CurrentElement, PreviewArea, Square, TableArea};
+// use bevy_inspector_egui::{RegisterInspectable, WorldInspectorPlugin};
+//
+// use crate::{CurrentElement, PreviewArea, Square, TableArea};
 
 pub struct DebugPlugin;
 
