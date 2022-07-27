@@ -1,8 +1,8 @@
-use std::borrow::BorrowMut;
+use std::borrow::{Borrow, BorrowMut};
 use std::collections::HashMap;
 use std::time::Duration;
 
-use bevy::prelude::*;
+use bevy::{prelude::*, sprite::collide_aabb::collide};
 use bevy::render::camera::ScalingMode;
 use rand::Rng;
 
@@ -43,12 +43,6 @@ pub struct PreviewArea;
 #[derive(Component, bevy_inspector_egui::Inspectable)]
 pub struct TableArea;
 
-#[derive(Component, bevy_inspector_egui::Inspectable)]
-pub struct Player {}
-
-// #[derive(Component, Deref, DerefMut)]
-// struct AnimationTimer(Timer);
-
 struct SpeedTimer(Timer);
 
 struct RemoveTimer(Timer);
@@ -68,7 +62,7 @@ impl Square {
     }
 }
 
-#[derive(Default, bevy_inspector_egui::Inspectable)]
+#[derive(Default)]
 pub struct CurrentElement {
     central_location: Vec2,
     shape: i32,
@@ -77,64 +71,150 @@ pub struct CurrentElement {
     is_initialized: bool,
 }
 
-
-#[allow(dead_code)]
-fn is_against_wall_x(tar: f32) -> bool {
-    if tar == 0. || tar >= 11.0 {
-        return true;
-    }
-    false
-}
-
 impl CurrentElement {
-    fn left(&mut self, match_square: Vec<Vec3>) {
-        if self.central_location.x == 0. {
-            return;
+    // 初始化
+    fn initialize(&mut self, shape: i32) {
+        self.central_location = Vec2::new(COL as f32 / 2., ROW as f32);
+        self.shape = shape;
+        self.state = 0;
+        self.direction = sprite::UP;
+        self.is_initialized = true;
+    }
+
+    fn left(&mut self, query: &Query<(&mut Sprite, &Transform, &mut Square), With<TableArea>>) {
+        let match_square = self.square_match(query);
+        // 墙壁判断
+        for v in match_square.iter() {
+            if v.x == 0. {
+                return;
+            }
         }
+
+        for target in match_square.iter() {
+            for (_sp, transform, sq) in query.iter() {
+                if sq.0 == STATE_TAKE {
+                    if target.x - 1. == transform.translation.x && target.y == transform.translation.y {
+                        return;
+                    }
+                }
+            }
+        }
+
         self.central_location.x -= 1.;
     }
-    fn right(&mut self, match_square: Vec<Vec3>) {
-        if self.central_location.x == COL as f32 {
-            return;
+
+    fn right(&mut self, query: &Query<(&mut Sprite, &Transform, &mut Square), With<TableArea>>) {
+        let match_square = self.square_match(query);
+        // 墙壁判断
+        for v in match_square.iter() {
+            if v.x + 1. == COL as f32 {
+                return;
+            }
         }
+
+        for target in match_square.iter() {
+            for (_sp, transform, sq) in query.iter() {
+                if sq.0 == STATE_TAKE {
+                    if target.x + 1. == transform.translation.x && target.y == transform.translation.y {
+                        return;
+                    }
+                }
+            }
+        }
+
         self.central_location.x += 1.;
     }
 
-    fn down(&mut self) {
-        self.central_location.y -= 1.0;
-    }
-
     // 旋转
-    fn rotate(&mut self, match_square: Vec<Vec3>) {
+    fn rotate(&mut self, query: &Query<(&mut Sprite, &Transform, &mut Square), With<TableArea>>) {
+        let match_square = self.square_match(query);
         self.direction += 1;
         if self.direction > 3 {
             self.direction = 0;
         }
     }
 
-    fn update_state(&mut self, state: i32) {
-        self.state = state;
+    fn update(&mut self, tt: Res<Time>,
+              mut timer: ResMut<SpeedTimer>,
+              query: &mut Query<(&mut Sprite, &Transform, &mut Square), With<TableArea>>) {
+        //逐步下降
+        if timer.0.tick(tt.delta()).just_finished() {
+            self.central_location.y -= 1.0;
+        }
+
+        let match_square = self.square_match(query.borrow());
+        // 标记当前元素是否需要被冻结
+        for ms in match_square.iter() {
+            let ms_y = ms.y;
+            let ms_x = ms.x;
+            let next_y = ms_y - 1.;
+            let next_x = ms_x;
+            for (_sp, transform, sq) in query.iter_mut() {
+                if transform.translation == *ms {
+                    if ms_y == 0. {
+                        //靠墙了,需要被冻结
+                        self.state = -1;
+                    }
+                } else if transform.translation.x == next_x && transform.translation.y == next_y && sq.0 == STATE_TAKE {
+                    //不是匹配方块，如果这个方块是匹配方块的下一行，且有任意一个是被占据的，则整个元素需要被冻结
+                    self.state = -1;
+                }
+            }
+        }
+
+        let mut need_init: bool = false;
+        //状态更新，设置颜色
+        for (mut sp, transform, mut sq) in query.iter_mut() {
+            if in_vec(transform.translation, &match_square) {
+                // 如果当前元素状态是冻结，这几个方块状态都设为占据
+                if self.state == -1 {
+                    need_init = true;
+                    sq.update_state(STATE_TAKE);
+                } else {
+                    sq.update_state(STATE_WALKING);
+                }
+                sp.color = sprite::get_color(self.shape);
+            } else {
+                // 不是当前元素方块的，恢复过渡状态的到初始状态
+                if sq.0 == STATE_WALKING {
+                    sq.update_state(STATE_EMPTY);
+                    sp.color = sprite::get_color(sprite::SHAPE_BG); //使用默认颜色
+                }
+            }
+        }
+
+        if need_init {
+            self.is_initialized = false;
+        }
     }
 
-    fn square_match(&mut self, loc: Vec3) -> bool {
-        return match self.shape {
-            sprite::SHAPE_T =>  sprite::shape_t_match(self.central_location, loc, self.direction),
-            sprite::SHAPE_O =>  sprite::shape_o_match(self.central_location, loc),
-            sprite::SHAPE_I =>  sprite::shape_i_match(self.central_location, loc, self.direction),
-            sprite::SHAPE_J =>  sprite::shape_j_match(self.central_location, loc, self.direction),
-            sprite::SHAPE_L =>  sprite::shape_l_match(self.central_location, loc, self.direction),
-            sprite::SHAPE_S =>  sprite::shape_s_match(self.central_location, loc, self.direction),
-            sprite::SHAPE_Z =>  sprite::shape_z_match(self.central_location, loc, self.direction),
-            _ => false,
-        };
+    fn square_match(&mut self, query: &Query<(&mut Sprite, &Transform, &mut Square), With<TableArea>>) -> Vec<Vec3> {
+        let mut match_square: Vec<Vec3> = Vec::default();
+        for (_sp, transform, sq) in query.iter() {
+            let loc = transform.translation;
+            let res = match self.shape {
+                sprite::SHAPE_T => sprite::shape_t_match(self.central_location, loc, self.direction),
+                sprite::SHAPE_O => sprite::shape_o_match(self.central_location, loc),
+                sprite::SHAPE_I => sprite::shape_i_match(self.central_location, loc, self.direction),
+                sprite::SHAPE_J => sprite::shape_j_match(self.central_location, loc, self.direction),
+                sprite::SHAPE_L => sprite::shape_l_match(self.central_location, loc, self.direction),
+                sprite::SHAPE_S => sprite::shape_s_match(self.central_location, loc, self.direction),
+                sprite::SHAPE_Z => sprite::shape_z_match(self.central_location, loc, self.direction),
+                _ => false,
+            };
+            if res {
+                match_square.push(transform.translation);
+            }
+        }
+        return match_square;
     }
 }
 
-
-fn pre_system(
-    mut state: Local<CurrentElement>,
-    mut query: Query<(&mut Sprite, &mut Square), With<PreviewArea>>,
-) {}
+//
+// fn pre_system(
+//     mut state: Local<CurrentElement>,
+//     mut query: Query<(&mut Sprite, &mut Square), With<PreviewArea>>,
+// ) {}
 
 // 方块消除
 fn remove_blocks(mut cmd: Commands, tt: Res<Time>, mut timer: ResMut<RemoveTimer>, mut state: Local<bool>, mut query: Query<(Entity, &mut Transform, &mut Square), With<TableArea>>) {
@@ -181,6 +261,7 @@ fn remove_blocks(mut cmd: Commands, tt: Res<Time>, mut timer: ResMut<RemoveTimer
     }
 }
 
+
 // 基础操作
 fn basic_system(
     input: Res<Input<KeyCode>>,
@@ -190,81 +271,24 @@ fn basic_system(
     mut state: Local<CurrentElement>,
 ) {
     if !state.is_initialized {
-        state.central_location = Vec2::new(COL as f32 / 2., ROW as f32);
-        state.shape = rand::thread_rng().gen_range(1..8);
-        info!("shape {:?}",state.shape);
-        state.update_state(0);
-        state.direction = sprite::UP;
         timer.0.set_duration(Duration::from_millis(500));
-        state.is_initialized = true;
-        info!("状态初始化");
+        state.initialize(rand::thread_rng().gen_range(1..8));
     }
 
-    // 查找当前时刻元素方块坐标
-    let mut match_square: Vec<Vec3> = Vec::default();
-    for (_sp, transform, sq) in query.iter() {
-        if state.square_match(transform.translation) {
-            match_square.push(transform.translation);
-        }
-    }
     if input.just_pressed(KeyCode::Left) || input.just_pressed(KeyCode::A) {
-        state.left(match_square.clone());
+        state.left(query.borrow());
     }
     if input.just_pressed(KeyCode::Right) || input.just_pressed(KeyCode::D) {
-        state.right(match_square.clone());
+        state.right(query.borrow());
     }
     if input.just_pressed(KeyCode::Up) || input.just_pressed(KeyCode::W) {
-        state.rotate(match_square.clone());
+        state.rotate(query.borrow());
     }
     if input.just_pressed(KeyCode::Down) || input.just_pressed(KeyCode::S) {
         timer.0.set_duration(Duration::from_millis(10));
     }
-    if timer.0.tick(tt.delta()).just_finished() {
-        state.down();
-    }
-    // 标记当前元素是否需要被冻结
-    for ms in match_square.iter() {
-        let ms_y = ms.y;
-        let ms_x = ms.x;
-        let next_y = ms_y - 1.;
-        let next_x = ms_x;
-        for (_sp, transform, sq) in query.iter_mut() {
-            if transform.translation == *ms {
-                if ms_y == 0. {
-                    //靠墙了,需要被冻结
-                    state.update_state(-1);
-                }
-            } else if transform.translation.x == next_x && transform.translation.y == next_y && sq.0 == STATE_TAKE {
-                //不是匹配方块，如果这个方块是匹配方块的下一行，且有任意一个是被占据的，则整个元素需要被冻结
-                state.update_state(-1);
-            }
-        }
-    }
 
-    let mut need_init: bool = false;
-    //状态更新，设置颜色
-    for (mut sp, transform, mut sq) in query.iter_mut() {
-        if in_vec(transform.translation, &match_square) {
-            // 如果当前元素状态是冻结，这几个方块状态都设为占据
-            if state.state == -1 {
-                need_init = true;
-                sq.update_state(STATE_TAKE);
-            } else {
-                sq.update_state(STATE_WALKING);
-            }
-            sp.color = sprite::get_color(state.shape);
-        } else {
-            // 不是当前元素方块的，恢复过渡状态的到初始状态
-            if sq.0 == STATE_WALKING {
-                sq.update_state(STATE_EMPTY);
-                sp.color = sprite::get_color(sprite::SHAPE_BG); //使用默认颜色
-            }
-        }
-    }
-
-    if need_init {
-        state.is_initialized = false;
-    }
+    state.update(tt, timer, query.borrow_mut());
 }
 
 fn in_vec(v: Vec3, data: &Vec<Vec3>) -> bool {
@@ -320,28 +344,28 @@ fn map_startup_system(mut commands: Commands) {
         insert_table_row(commands.borrow_mut(), row);
     }
     // 预览区
-    for row in 0..5 {
-        for col in 0..5 {
-            let brick_position = Vec2::new(
-                PRE_AREA_X + col as f32 * (0.8),
-                PRE_AREA_Y + row as f32 * (0.8),
-            );
-            let color = sprite::get_color(sprite::SHAPE_PRE);
-            commands
-                .spawn()
-                .insert_bundle(SpriteBundle {
-                    sprite: Sprite {
-                        color,
-                        ..default()
-                    },
-                    transform: Transform {
-                        translation: brick_position.extend(0.0),
-                        scale: Vec3::new(SCALE * 0.8, SCALE * 0.8, 1.0),
-                        ..default()
-                    },
-                    ..default()
-                })
-                .insert(PreviewArea);
-        }
-    }
+    // for row in 0..5 {
+    //     for col in 0..5 {
+    //         let brick_position = Vec2::new(
+    //             PRE_AREA_X + col as f32 * (0.8),
+    //             PRE_AREA_Y + row as f32 * (0.8),
+    //         );
+    //         let color = sprite::get_color(sprite::SHAPE_PRE);
+    //         commands
+    //             .spawn()
+    //             .insert_bundle(SpriteBundle {
+    //                 sprite: Sprite {
+    //                     color,
+    //                     ..default()
+    //                 },
+    //                 transform: Transform {
+    //                     translation: brick_position.extend(0.0),
+    //                     scale: Vec3::new(SCALE * 0.8, SCALE * 0.8, 1.0),
+    //                     ..default()
+    //                 },
+    //                 ..default()
+    //             })
+    //             .insert(PreviewArea);
+    //     }
+    // }
 }

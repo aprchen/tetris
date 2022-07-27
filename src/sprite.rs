@@ -15,7 +15,7 @@ pub const UP: i32 = 0;
 pub const RIGHT: i32 = 1;
 pub const DOWN: i32 = 2;
 pub const LEFT: i32 = 3;
-pub const DEFAULT_COLOR: Color = Color::rgb(0.2, 0.2, 1.0);
+pub const DEFAULT_COLOR: Color = Color::rgb(0.2, 0.2, 0.6);
 const PRE_COLOR: Color = Color::rgb(0.3, 0.5, 0.3);
 
 
@@ -121,7 +121,6 @@ pub fn shape_l_match(self_loc: Vec2, tar_loc: Vec3, direction: i32) -> bool {
     false
 }
 
-//todo
 pub fn shape_j_match(self_loc: Vec2, tar_loc: Vec3, direction: i32) -> bool {
     let x = tar_loc.x;
     let y = tar_loc.y;

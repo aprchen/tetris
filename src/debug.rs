@@ -12,12 +12,12 @@ impl Plugin for DebugPlugin {
         if cfg!(debug_assertions) {
             app.add_plugin(FrameTimeDiagnosticsPlugin)
                 .add_plugin(EntityCountDiagnosticsPlugin)
-                .add_plugin(EditorPlugin)
-                .add_plugin(WorldInspectorPlugin::new())
-                .register_inspectable::<TableArea>()
-                .register_inspectable::<Square>()
-                .register_inspectable::<CurrentElement>()
-                .register_inspectable::<PreviewArea>();
+                .add_plugin(EditorPlugin);
+                // .add_plugin(WorldInspectorPlugin::new())
+                // .register_inspectable::<TableArea>()
+                // .register_inspectable::<Square>()
+                // .register_inspectable::<CurrentElement>()
+                // .register_inspectable::<PreviewArea>();
         }
     }
 }
